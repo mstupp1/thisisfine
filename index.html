@@ -1,0 +1,822 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>This is Fine: The Game</title>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
+    <style>
+        /* Basic styling for body */
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            background-color: #333; /* Dark background */
+            margin: 0;
+            font-family: 'Press Start 2P', cursive; /* Arcade font */
+            overflow: hidden; /* Hide scrollbars */
+            color: #fff;
+            flex-direction: column; /* Stack game and messages */
+        }
+
+        /* Container for the game area */
+        #game-container {
+            width: 90vw; /* Wider */
+            max-width: 800px; /* Wider */
+            height: 70vh;
+            max-height: 450px;
+            border: 2px solid #fff; /* Thinner border */
+            border-radius: 15px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 0 20px rgba(255, 100, 0, 0.7);
+            margin-bottom: 20px;
+
+            /* Softer, Stylized Fire Background */
+            background-color: #4d1100; /* Dark reddish-brown base */
+            background-image:
+                radial-gradient(ellipse at bottom, rgba(255,200,0,0.7) 0%, rgba(255,100,0,0.4) 40%, rgba(200,0,0,0.1) 70%, transparent 80%),
+                radial-gradient(ellipse at bottom left, rgba(255,220,0,0.6) 0%, rgba(255,120,0,0.3) 40%, transparent 70%),
+                radial-gradient(ellipse at bottom right, rgba(255,210,0,0.6) 0%, rgba(255,110,0,0.3) 40%, transparent 70%);
+
+            background-repeat: no-repeat; /* Keep no-repeat */
+            /* --- CHANGE: Increased gradient height percentages --- */
+            background-size: 150% 95%, 100% 75%, 100% 75%; /* Taller flames */
+            /* --- End Background Size Change --- */
+            background-position: center bottom, 10% bottom, 90% bottom; /* Position flames */
+            animation: soft-fire-flicker 4s ease-in-out infinite alternate;
+        }
+
+        /* Keyframes for softer fire flicker */
+        /* --- CHANGE: Adjusted keyframe sizes to match taller base --- */
+        @keyframes soft-fire-flicker {
+            0% {
+                background-size: 150% 95%, 100% 75%, 100% 75%;
+                background-position: center bottom, 10% bottom, 90% bottom;
+                opacity: 0.9;
+            }
+            50% {
+                 background-size: 140% 100%, 110% 72%, 95% 78%; /* Vary sizes */
+                 background-position: center bottom, 15% bottom, 85% bottom; /* Vary positions slightly */
+                 opacity: 1;
+            }
+            100% {
+                background-size: 150% 95%, 100% 75%, 100% 75%;
+                background-position: center bottom, 10% bottom, 90% bottom;
+                opacity: 0.9;
+            }
+        }
+        /* --- End Keyframes Change --- */
+
+
+        /* Ground Styling */
+        #ground {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            width: 100%;
+            height: 15px; /* Height of the ground */
+            background-color: black;
+            z-index: 0;
+        }
+        /* Step Styling */
+        .step {
+            position: absolute;
+            background-color: black; /* Match ground */
+            height: 15px; /* Increased height */
+            width: 60px; /* Width of steps */
+            bottom: 15px; /* Sit on top of the main ground */
+            z-index: 0;
+            border-radius: 2px;
+            border: 1px solid #444;
+        }
+
+
+        /* Game Info Display (Hearts & Level) */
+        #game-info {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            right: 10px;
+            display: flex;
+            justify-content: space-between;
+            font-size: 1em;
+            color: rgba(0, 0, 0, 0.7);
+            z-index: 5;
+            pointer-events: none;
+            visibility: hidden; /* Hidden initially */
+        }
+        #hearts-display, #level-display {
+            background-color: rgba(255, 255, 255, 0.5);
+            padding: 5px 10px;
+            border-radius: 5px;
+        }
+
+        /* Player element (dog) */
+        #player {
+            position: absolute;
+            transform: translateX(-50%) scaleX(-1); /* Flipped to face right */
+            width: 50px;
+            height: 50px;
+            font-size: 40px;
+            text-align: center;
+            user-select: none;
+            z-index: 3;
+            visibility: hidden;
+            transition: transform 0.1s linear;
+            /* bottom will be set by JS based on groundLevel */
+        }
+        #player.flipped {
+            transform: translateX(-50%) scaleX(1); /* Default scale (faces left) */
+        }
+
+
+        /* Coffee element attached to the player */
+        #coffee {
+            position: absolute;
+            top: -25px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 20px;
+            user-select: none;
+            display: inline-block;
+        }
+
+        /* Falling obstacle elements */
+        .obstacle {
+            position: absolute;
+            top: -30px;
+            width: 30px;
+            height: 30px;
+            font-size: 25px;
+            user-select: none;
+            z-index: 1;
+        }
+
+        /* Static Obstacle Styling */
+        .static-obstacle {
+            position: absolute;
+            bottom: 15px; /* Sit on the ground */
+            width: 40px;
+            height: 40px;
+            font-size: 35px;
+            user-select: none;
+            z-index: 1;
+        }
+
+        /* Crow Obstacle Styling */
+        .crow-obstacle {
+            position: absolute;
+            width: 40px;
+            height: 40px;
+            font-size: 35px;
+            user-select: none;
+            z-index: 2;
+            /* Crow faces default (right) */
+        }
+
+
+        /* Hit Effect Styling */
+        #hit-effect {
+            position: absolute;
+            font-size: 30px;
+            color: red;
+            user-select: none;
+            pointer-events: none;
+            z-index: 6;
+            display: none;
+        }
+        .fade-out-up-animation {
+             animation: fadeOutUp 1s ease-out forwards;
+        }
+        @keyframes fadeOutUp {
+            from { opacity: 1; transform: translate(-50%, 0); }
+            to { opacity: 0; transform: translate(-50%, -50px); }
+        }
+
+        /* Player Flash Animation */
+        .flash-animation {
+            animation: flash 0.2s linear infinite;
+        }
+        @keyframes flash {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.3; }
+        }
+
+        /* Exit element (door) */
+        #exit {
+            position: absolute;
+            bottom: 15px; /* Sit on the ground */
+            right: 10px;
+            width: 50px;
+            height: 50px;
+            font-size: 40px;
+            text-align: center;
+            user-select: none;
+            z-index: 1;
+            visibility: hidden;
+        }
+
+        /* Message box */
+        #message-box {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.7); /* More transparent */
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            text-align: center;
+            font-size: 1.2em;
+            z-index: 10;
+            display: none;
+            border: 3px solid #fff;
+            white-space: pre-line;
+        }
+        #message-box .title {
+            font-size: 1.8em;
+            margin-bottom: 20px;
+            display: block;
+            color: #ffcc66;
+            text-shadow: 2px 2px #ff6600;
+        }
+        /* Styling for blinking/glowing action text */
+        .start-key {
+            font-size: 1.5em;
+            animation: blink-glow 2.5s ease-in-out infinite;
+            display: inline-block;
+            margin-bottom: 8px;
+        }
+        @keyframes blink-glow {
+            0%, 100% {
+                opacity: 1;
+                text-shadow: 0 0 5px #fff, 0 0 10px #fff, 0 0 15px #ffdd88;
+            }
+            50% {
+                opacity: 0.7;
+                text-shadow: 0 0 2px #fff, 0 0 5px #ffdd88;
+            }
+        }
+        /* Styling for space bar icon */
+        .spacebar-icon {
+            display: inline-block;
+            width: 100px;
+            height: 20px;
+            border: 2px solid #ccc;
+            background-color: #eee;
+            border-radius: 5px;
+            margin-top: 10px;
+            box-shadow: inset 0 -2px #aaa;
+            position: relative; /* Needed for pseudo-element */
+        }
+        .spacebar-icon::after {
+            content: '';
+            position: absolute;
+            bottom: 4px; /* Position near bottom */
+            left: 50%;
+            transform: translateX(-50%);
+            width: 40%; /* Width relative to parent */
+            height: 2px; /* Thickness */
+            background-color: #888; /* Line color */
+            border-radius: 1px;
+        }
+
+
+        /* Restart button (hidden) */
+        #message-box button {
+            font-family: 'Press Start 2P', cursive;
+            font-size: 0.8em;
+            padding: 10px 20px;
+            margin-top: 20px;
+            cursor: pointer;
+            background-color: #ff9933;
+            border: 2px solid #fff;
+            color: #fff;
+            border-radius: 5px;
+            text-shadow: 1px 1px #000;
+            display: none;
+        }
+         #message-box button:hover {
+             background-color: #ff6600;
+         }
+
+        /* Instructions text */
+        #instructions {
+            margin-top: 15px;
+            font-size: 0.8em;
+            color: #ccc;
+            text-align: center;
+        }
+
+        /* Keyframes for player shake animation */
+        @keyframes shake {
+          0% { transform: translate(1px, 1px) rotate(0deg); } 10% { transform: translate(-1px, -2px) rotate(-1deg); } 20% { transform: translate(-3px, 0px) rotate(1deg); } 30% { transform: translate(3px, 2px) rotate(0deg); } 40% { transform: translate(1px, -1px) rotate(1deg); } 50% { transform: translate(-1px, 2px) rotate(-1deg); } 60% { transform: translate(-3px, 1px) rotate(0deg); } 70% { transform: translate(3px, 1px) rotate(-1deg); } 80% { transform: translate(-1px, -1px) rotate(1deg); } 90% { transform: translate(1px, 2px) rotate(0deg); } 100% { transform: translate(1px, -2px) rotate(-1deg); }
+        }
+
+    </style>
+</head>
+<body>
+
+    <div id="game-container">
+         <div id="game-info">
+            <div id="hearts-display">Hearts: ❤️❤️❤️</div>
+            <div id="level-display">Level: 1</div>
+        </div>
+        <div id="ground"></div>
+        <div id="player">
+            <div id="coffee">☕</div> 🐕 </div>
+        <div id="exit">🚪</div>
+        <div id="hit-effect"></div>
+        <div id="message-box">
+            <p id="message-text"></p>
+            <button id="restart-button">Restart</button>
+        </div>
+    </div>
+    <div id="instructions">Arrows: Move | Space/Up: Jump/Double Jump (Hold for height) / Start / Restart | Avoid 🔥, 🧱 & 🐦‍⬛ | Reach 🚪!</div>
+
+    <script>
+        // --- Get Game Elements ---
+        const gameContainer = document.getElementById('game-container');
+        const player = document.getElementById('player');
+        const coffee = document.getElementById('coffee');
+        const exit = document.getElementById('exit');
+        const messageBox = document.getElementById('message-box');
+        const messageText = document.getElementById('message-text');
+        const heartsDisplay = document.getElementById('hearts-display');
+        const levelDisplay = document.getElementById('level-display');
+        const instructions = document.getElementById('instructions');
+        const hitEffectElement = document.getElementById('hit-effect');
+        const gameInfo = document.getElementById('game-info');
+        // Ground element reference not strictly needed unless manipulating it
+
+        // --- Game State Variables ---
+        let playerPos = { x: 0, y: 0 };
+        let fallingObstacles = [];
+        let staticObstacles = [];
+        let horizontalObstacles = [];
+        let steps = []; // Array for step elements
+        let gameLoopInterval = null;
+        let fallingObstacleInterval = null;
+        let crowInterval = null;
+        let gameSpeed;
+        let obstacleSpawnRate;
+        let numStaticObstacles;
+        let crowSpeed;
+        let crowSpawnRate;
+        let isGameOver = true;
+        let gameHasEverStarted = false;
+        const maxHearts = 3;
+        let hearts = maxHearts;
+        let currentLevel = 1;
+        let messageTimeout;
+        let levelTransitionTimeout;
+        let isTransitioningLevel = false;
+        let isInvincible = false;
+        let invincibilityTimer = null;
+        let hitEffectTimer = null;
+
+        // --- Movement & Physics ---
+        let moveDirection = { left: false, right: false };
+        const playerSpeed = 2;
+        let isJumping = false;
+        let velocityY = 0;
+        const gravity = 0.3;
+        const jumpPower = 7;
+        const doubleJumpPower = jumpPower * 0.85;
+        let doubleJumpAvailable = true;
+        const groundLevel = 15; // Matches ground height
+        const staticObstacleSpacing = 55;
+        const numStepsPerLevel = 4; // How many steps to create
+
+        // --- Settings ---
+        const fallingObstacleEmoji = '🔥';
+        const staticObstacleEmoji = '🧱';
+        const crowEmoji = '🐦‍⬛';
+        const hitEffectEmoji = '💔';
+        const hitboxPadding = 8;
+        const levelTransitionDelay = 2000;
+        const invincibilityDuration = 1500;
+        const hitEffectDuration = 1000;
+
+        // --- Level Difficulty Parameters ---
+        const levelParams = [
+            { speed: 1.5, spawnRate: 1800, numStatic: 2, crowSpawnRate: 99999, crowSpeed: 0 }, // Level 1
+            { speed: 2.0, spawnRate: 1500, numStatic: 3, crowSpawnRate: 5000, crowSpeed: 1.5 }, // Level 2
+            { speed: 2.0, spawnRate: 1200, numStatic: 4, crowSpawnRate: 4000, crowSpeed: 2.0 }, // Level 3
+            { speed: 2.5, spawnRate: 1000, numStatic: 4, crowSpawnRate: 3000, crowSpeed: 2.5 }, // Level 4
+            { speed: 2.5, spawnRate: 900, numStatic: 5, crowSpawnRate: 2500, crowSpeed: 3.0 }  // Level 5+
+        ];
+
+        // --- UI Update Functions ---
+        function updateHeartsDisplay() { heartsDisplay.textContent = "Hearts: " + "❤️".repeat(hearts) + "🖤".repeat(maxHearts - hearts); }
+        function updateLevelDisplay() { levelDisplay.textContent = "Level: " + currentLevel; }
+
+        // --- Player Movement ---
+        function updatePlayerMovement() {
+            if (isGameOver || isTransitioningLevel) return;
+            const containerWidth = gameContainer.offsetWidth;
+            const playerWidth = player.offsetWidth;
+            let moved = false;
+            if (moveDirection.left) {
+                playerPos.x -= playerSpeed; player.classList.add('flipped'); moved = true;
+            }
+            if (moveDirection.right) {
+                playerPos.x += playerSpeed; player.classList.remove('flipped'); moved = true;
+            }
+            if (playerPos.x < playerWidth / 2) { playerPos.x = playerWidth / 2; }
+            if (playerPos.x > containerWidth - playerWidth / 2) { playerPos.x = containerWidth - playerWidth / 2; }
+            if(moved) { player.style.left = `${playerPos.x}px`; }
+        }
+
+        // --- Jump Function (Initiates Jump or Double Jump) ---
+        function initiateJump() {
+            if (isGameOver || isTransitioningLevel) return;
+            if (!isJumping && playerPos.y === groundLevel) {
+                 isJumping = true; doubleJumpAvailable = true; velocityY = jumpPower;
+            } else if (isJumping && doubleJumpAvailable) {
+                 velocityY = doubleJumpPower; doubleJumpAvailable = false;
+            }
+        }
+
+        // --- Function to cut jump short on key release ---
+        function cutJump() { if (isJumping && velocityY > 0) { velocityY = 2; } }
+
+        // --- Obstacle Handling ---
+        function createFallingObstacle() {
+            if (isGameOver || isTransitioningLevel) return;
+            const obstacle = document.createElement('div'); obstacle.classList.add('obstacle');
+            obstacle.textContent = fallingObstacleEmoji; obstacle.style.left = `${Math.random() * (gameContainer.offsetWidth - 30)}px`;
+            obstacle.style.top = '-30px'; gameContainer.appendChild(obstacle); fallingObstacles.push(obstacle);
+        }
+        function createHorizontalObstacle() {
+            if (isGameOver || isTransitioningLevel || crowSpeed <= 0) return;
+            const obstacle = document.createElement('div'); obstacle.classList.add('crow-obstacle');
+            obstacle.textContent = crowEmoji; const gameHeight = gameContainer.offsetHeight;
+            const crowHeight = 40; const minY = groundLevel + 20; const maxY = gameHeight - crowHeight - 50;
+            obstacle.style.bottom = `${minY + Math.random() * (maxY - minY)}px`;
+            obstacle.style.left = `${gameContainer.offsetWidth + 40}px`; obstacle.direction = -1;
+            gameContainer.appendChild(obstacle); horizontalObstacles.push(obstacle);
+        }
+        function createStaticObstacles() {
+            staticObstacles.forEach(obstacle => obstacle.remove()); staticObstacles = [];
+            const containerWidth = gameContainer.offsetWidth; const playerWidth = player.offsetWidth || 50;
+            const exitWidth = exit.offsetWidth || 50; const obstacleWidth = 40;
+            const safeZoneStart = playerWidth * 2; const safeZoneEnd = containerWidth - exitWidth * 2;
+            for (let i = 0; i < numStaticObstacles; i++) {
+                let obstacleX, placed = false, attempts = 0;
+                while (!placed && attempts < 30) {
+                    attempts++; if (safeZoneEnd <= safeZoneStart) break;
+                    obstacleX = safeZoneStart + Math.random() * (safeZoneEnd - safeZoneStart - obstacleWidth);
+                    let overlaps = staticObstacles.some(existing => {
+                        const existingX = parseFloat(existing.style.left); if (isNaN(existingX)) return false;
+                        const newRectLeft = obstacleX - obstacleWidth / 2; const newRectRight = obstacleX + obstacleWidth / 2;
+                        const existingRectLeft = existingX - obstacleWidth / 2; const existingRectRight = existingX + obstacleWidth / 2;
+                        return !(newRectRight < existingRectLeft - staticObstacleSpacing || newRectLeft > existingRectRight + staticObstacleSpacing);
+                    });
+                    let overlapsStep = steps.some(step => {
+                        const stepX = parseFloat(step.style.left);
+                        const stepWidth = parseFloat(step.style.width);
+                        if(isNaN(stepX)) return false;
+                        const newRectLeft = obstacleX - obstacleWidth / 2; const newRectRight = obstacleX + obstacleWidth / 2;
+                        const stepRectLeft = stepX; const stepRectRight = stepX + stepWidth;
+                        return !(newRectRight < stepRectLeft || newRectLeft > stepRectRight);
+                    });
+                    if (!overlaps && !overlapsStep) placed = true;
+                }
+                if (placed) {
+                    const obstacle = document.createElement('div'); obstacle.classList.add('static-obstacle');
+                    obstacle.textContent = staticObstacleEmoji; obstacle.style.left = `${obstacleX}px`;
+                    obstacle.style.transform = 'translateX(-50%)'; gameContainer.appendChild(obstacle); staticObstacles.push(obstacle);
+                } else if (gameHasEverStarted) { console.warn("Could not place static obstacle without overlap."); }
+            }
+        }
+        // Create visual steps
+        function createSteps() {
+            steps.forEach(step => step.remove()); steps = [];
+            const containerWidth = gameContainer.offsetWidth;
+            const stepWidth = 60;
+            const playerWidth = player.offsetWidth || 50;
+            const exitWidth = exit.offsetWidth || 50;
+            const safeZoneStart = playerWidth * 1.5;
+            const safeZoneEnd = containerWidth - exitWidth * 1.5;
+
+             for (let i = 0; i < numStepsPerLevel; i++) { // Use updated constant
+                let stepX, placed = false, attempts = 0;
+                while (!placed && attempts < 20) {
+                    attempts++;
+                    if (safeZoneEnd <= safeZoneStart + stepWidth) break;
+                    stepX = safeZoneStart + Math.random() * (safeZoneEnd - safeZoneStart - stepWidth);
+
+                    let overlapsStep = steps.some(existing => {
+                        const existingX = parseFloat(existing.style.left);
+                        return Math.abs(stepX - existingX) < stepWidth * 1.5;
+                    });
+                     let overlapsStatic = staticObstacles.some(staticOb => {
+                        const staticX = parseFloat(staticOb.style.left);
+                        const staticWidth = parseFloat(staticOb.style.width);
+                         if(isNaN(staticX)) return false;
+                        const staticRectLeft = staticX - staticWidth / 2;
+                        const staticRectRight = staticX + staticWidth / 2;
+                        const stepRectLeft = stepX; const stepRectRight = stepX + stepWidth;
+                        return !(stepRectRight < staticRectLeft || stepRectLeft > staticRectRight);
+                    });
+
+                    if (!overlapsStep && !overlapsStatic) placed = true;
+                }
+
+                if(placed) {
+                    const step = document.createElement('div');
+                    step.classList.add('step');
+                    step.style.left = `${stepX}px`;
+                    const firstGameElement = gameContainer.querySelector('#player, #exit, .obstacle, .static-obstacle, .crow-obstacle');
+                    if(firstGameElement) {
+                        gameContainer.insertBefore(step, firstGameElement);
+                    } else {
+                        gameContainer.appendChild(step);
+                    }
+                    steps.push(step);
+                }
+            }
+        }
+
+
+        // --- Obstacle Movement ---
+        function moveFallingObstacles() {
+            if (isTransitioningLevel) return;
+            fallingObstacles.forEach((obstacle, index) => {
+                if (!obstacle || !obstacle.parentNode) { fallingObstacles.splice(index, 1); return; }
+                let topPos = parseInt(obstacle.style.top || -30); topPos += gameSpeed; obstacle.style.top = `${topPos}px`;
+                if (topPos > gameContainer.offsetHeight) { obstacle.remove(); fallingObstacles.splice(index, 1); }
+            });
+        }
+        function moveHorizontalObstacles() {
+            if (isTransitioningLevel) return;
+            const containerWidth = gameContainer.offsetWidth;
+            horizontalObstacles.forEach((obstacle, index) => {
+                 if (!obstacle || !obstacle.parentNode) { horizontalObstacles.splice(index, 1); return; }
+                 let leftPos = parseFloat(obstacle.style.left || 0); leftPos += obstacle.direction * crowSpeed;
+                 obstacle.style.left = `${leftPos}px`;
+                 if ((obstacle.direction === 1 && leftPos > containerWidth + 50) || (obstacle.direction === -1 && leftPos < -50)) {
+                     obstacle.remove(); horizontalObstacles.splice(index, 1);
+                 }
+            });
+        }
+
+        // --- Physics Update ---
+        function updatePlayerPhysics() {
+            if (isGameOver || isTransitioningLevel) return;
+            if (isJumping || playerPos.y > groundLevel) { velocityY -= gravity; playerPos.y += velocityY; }
+            if (playerPos.y <= groundLevel) {
+                playerPos.y = groundLevel; velocityY = 0;
+                if (isJumping) { isJumping = false; doubleJumpAvailable = true; }
+            }
+            player.style.bottom = `${playerPos.y}px`;
+        }
+
+        // --- Collision Detection ---
+        function checkCollisions() {
+            if (isGameOver || isTransitioningLevel || isInvincible) return;
+            const playerRect = player.getBoundingClientRect(); if (!playerRect || playerRect.width === 0) return;
+            const exitRect = exit.getBoundingClientRect();
+            if (exitRect.width > 0 && Math.abs(playerPos.y - groundLevel) < 5 && isColliding(playerRect, exitRect, hitboxPadding)) { handleLevelWin(); return; }
+            for (let i = fallingObstacles.length - 1; i >= 0; i--) {
+                 const obstacle = fallingObstacles[i]; if (!obstacle || !obstacle.parentNode) { fallingObstacles.splice(i, 1); continue; }
+                 const obstacleRect = obstacle.getBoundingClientRect(); if (obstacleRect.width > 0 && isColliding(playerRect, obstacleRect, hitboxPadding)) { handleHit(); return; }
+            }
+            for (let i = staticObstacles.length - 1; i >= 0; i--) {
+                 const obstacle = staticObstacles[i]; if (!obstacle || !obstacle.parentNode) { staticObstacles.splice(i, 1); continue; }
+                 const obstacleRect = obstacle.getBoundingClientRect(); if (obstacleRect.width > 0 && isColliding(playerRect, obstacleRect, hitboxPadding)) { handleHit(); return; }
+            }
+            for (let i = horizontalObstacles.length - 1; i >= 0; i--) {
+                 const obstacle = horizontalObstacles[i]; if (!obstacle || !obstacle.parentNode) { horizontalObstacles.splice(i, 1); continue; }
+                 const obstacleRect = obstacle.getBoundingClientRect(); if (obstacleRect.width > 0 && isColliding(playerRect, obstacleRect, hitboxPadding)) { handleHit(); return; }
+            }
+        }
+
+        // Collision Helper
+        function isColliding(rect1, rect2, padding = 0) {
+             if (!rect1 || !rect2 || rect1.width === 0 || rect2.width === 0 || rect1.height === 0 || rect2.height === 0) { return false; }
+            return !((rect1.right - padding) < (rect2.left + padding) || (rect1.left + padding) > (rect2.right - padding) || (rect1.bottom - padding) < (rect2.top + padding) || (rect1.top + padding) > (rect2.bottom - padding));
+        }
+
+        // --- Game Loop (Smoothed) ---
+        function gameLoop(currentTime) {
+            if (isGameOver) { gameLoopInterval = null; return; }
+            if (!isTransitioningLevel) {
+                updatePlayerMovement(); updatePlayerPhysics(); moveFallingObstacles(); moveHorizontalObstacles(); checkCollisions();
+            }
+            gameLoopInterval = requestAnimationFrame(gameLoop);
+        }
+
+        // --- Messaging ---
+        function showPermanentMessage(htmlContent) {
+            clearTimeout(messageTimeout); clearTimeout(levelTransitionTimeout);
+            messageText.innerHTML = htmlContent;
+            messageBox.style.display = 'block';
+            instructions.style.display = 'none';
+        }
+        function showTemporaryMessage(htmlContent, duration = 1500) {
+             clearTimeout(messageTimeout); clearTimeout(levelTransitionTimeout);
+             messageText.innerHTML = htmlContent;
+             messageBox.style.display = 'block';
+             instructions.style.display = 'none';
+             messageTimeout = setTimeout(() => {
+                 messageBox.style.display = 'none'; if (!isGameOver) { instructions.style.display = 'block'; }
+             }, duration);
+        }
+
+        // --- Game Events ---
+        function handleHit() {
+            if (isGameOver || isTransitioningLevel || isInvincible) return;
+            hearts--; updateHeartsDisplay();
+            if (hearts <= 0) { gameOver(); }
+            else {
+                isInvincible = true; player.classList.add('flash-animation');
+                clearTimeout(invincibilityTimer);
+                invincibilityTimer = setTimeout(() => {
+                    isInvincible = false; player.classList.remove('flash-animation'); player.style.opacity = 1;
+                }, invincibilityDuration);
+
+                hitEffectElement.textContent = hitEffectEmoji;
+                hitEffectElement.style.left = `${playerPos.x}px`; hitEffectElement.style.bottom = `${playerPos.y + player.offsetHeight}px`;
+                hitEffectElement.style.display = 'block'; hitEffectElement.classList.remove('fade-out-up-animation');
+                void hitEffectElement.offsetWidth; hitEffectElement.classList.add('fade-out-up-animation');
+                clearTimeout(hitEffectTimer);
+                hitEffectTimer = setTimeout(() => { hitEffectElement.style.display = 'none'; }, hitEffectDuration);
+
+                const playerWidth = player.offsetWidth || 50; playerPos.x = playerWidth / 2;
+                playerPos.y = groundLevel; // Reset to new ground level
+                player.style.left = `${playerPos.x}px`; player.style.bottom = `${playerPos.y}px`;
+                player.classList.remove('flipped'); // Reset facing to default (right)
+                isJumping = false; velocityY = 0; coffee.textContent = '☕';
+                doubleJumpAvailable = true;
+            }
+        }
+
+
+        function handleLevelWin() {
+             if (isGameOver || isTransitioningLevel) return;
+             console.log(`Level ${currentLevel} Complete!`); isTransitioningLevel = true;
+             if (fallingObstacleInterval) clearInterval(fallingObstacleInterval); fallingObstacleInterval = null;
+             if (crowInterval) clearInterval(crowInterval); crowInterval = null;
+             moveDirection.left = false; moveDirection.right = false;
+             currentLevel++; updateLevelDisplay();
+             showTemporaryMessage(`Level ${currentLevel}!`, levelTransitionDelay - 100);
+             clearTimeout(levelTransitionTimeout);
+             levelTransitionTimeout = setTimeout(() => { loadLevel(currentLevel); }, levelTransitionDelay);
+        }
+
+        function gameOver() {
+            if (isGameOver) return;
+            console.log("Game Over!"); isGameOver = true; gameHasEverStarted = true;
+            if (gameLoopInterval) cancelAnimationFrame(gameLoopInterval); gameLoopInterval = null;
+            if (fallingObstacleInterval) clearInterval(fallingObstacleInterval); fallingObstacleInterval = null;
+            if (crowInterval) clearInterval(crowInterval); crowInterval = null;
+            clearTimeout(levelTransitionTimeout); levelTransitionTimeout = null;
+            clearTimeout(invincibilityTimer); invincibilityTimer = null;
+            clearTimeout(hitEffectTimer); hitEffectTimer = null;
+            isTransitioningLevel = false; isInvincible = false;
+            player.classList.remove('flash-animation'); player.style.opacity = 1;
+            player.classList.remove('flipped'); // Reset facing to default (right)
+            coffee.textContent = '💦';
+            showPermanentMessage("<span class='title'>GAME OVER!</span><span class='start-key'>Restart</span><br><div class='spacebar-icon'></div>");
+            gameInfo.style.visibility = 'hidden'; // Hide UI
+        }
+
+        // Updated loadLevel
+        function loadLevel(levelNum) {
+             console.log(`Loading Level ${levelNum}. Player Speed: ${playerSpeed}`);
+             const paramsIndex = Math.min(levelNum - 1, levelParams.length - 1);
+             const params = levelParams[paramsIndex];
+             gameSpeed = params.speed; obstacleSpawnRate = params.spawnRate; numStaticObstacles = params.numStatic;
+             crowSpeed = params.crowSpeed; crowSpawnRate = params.crowSpawnRate;
+
+             const playerWidth = player.offsetWidth || 50; playerPos.x = playerWidth / 2;
+             playerPos.y = groundLevel; // Set player Y to new ground level
+             player.style.left = `${playerPos.x}px`; player.style.bottom = `${playerPos.y}px`; // Apply initial position
+             player.classList.remove('flipped'); // Reset facing to default (right)
+             isJumping = false; velocityY = 0; isInvincible = false; doubleJumpAvailable = true;
+             player.classList.remove('flash-animation'); player.style.opacity = 1;
+
+             // Clear all dynamic elements
+             fallingObstacles.forEach(obstacle => obstacle.remove()); fallingObstacles = [];
+             horizontalObstacles.forEach(obstacle => obstacle.remove()); horizontalObstacles = [];
+             steps.forEach(step => step.remove()); steps = []; // Clear old steps
+             staticObstacles.forEach(obstacle => obstacle.remove()); staticObstacles = []; // Clear static obstacles too
+
+             // Clear intervals
+             if (fallingObstacleInterval) clearInterval(fallingObstacleInterval); fallingObstacleInterval = null;
+             if (crowInterval) clearInterval(crowInterval); crowInterval = null;
+
+             // Create new elements for the level
+             createStaticObstacles(); // Create static obstacles first
+             createSteps(); // Then create steps (checks against static obstacles)
+             // Make sure they are visible
+             staticObstacles.forEach(ob => ob.style.visibility = 'visible');
+             steps.forEach(step => step.style.visibility = 'visible');
+
+             fallingObstacleInterval = setInterval(createFallingObstacle, obstacleSpawnRate);
+             if (crowSpawnRate < 99999) { crowInterval = setInterval(createHorizontalObstacle, crowSpawnRate); }
+
+             updateLevelDisplay();
+             isTransitioningLevel = false;
+
+             // Ensure game loop starts/continues
+             if (!isGameOver && !gameLoopInterval) {
+                 console.log("Restarting game loop after loading level.");
+                 gameLoopInterval = requestAnimationFrame(gameLoop);
+             }
+        }
+
+
+        // Updated startGame
+        function startGame() {
+            console.log("Starting Game");
+            clearTimeout(messageTimeout); clearTimeout(levelTransitionTimeout);
+            clearTimeout(invincibilityTimer); clearTimeout(hitEffectTimer);
+            isGameOver = false; gameHasEverStarted = true; hearts = maxHearts; currentLevel = 1;
+            isTransitioningLevel = false; isInvincible = false;
+            updateHeartsDisplay();
+            player.style.visibility = 'visible'; exit.style.visibility = 'visible';
+            gameInfo.style.visibility = 'visible'; // Show UI
+            player.classList.remove('flash-animation'); player.style.opacity = 1;
+            player.classList.remove('flipped'); // Reset facing to default (right)
+            moveDirection.left = false; moveDirection.right = false;
+            player.style.animation = 'none'; coffee.textContent = '☕';
+            messageBox.style.display = 'none';
+            instructions.style.display = 'block';
+            hitEffectElement.style.display = 'none';
+
+            // Clear intervals and arrays before loading level
+            if (gameLoopInterval) cancelAnimationFrame(gameLoopInterval); gameLoopInterval = null;
+            if (fallingObstacleInterval) clearInterval(fallingObstacleInterval); fallingObstacleInterval = null;
+            if (crowInterval) clearInterval(crowInterval); crowInterval = null;
+            steps.forEach(step => step.remove()); steps = []; // Clear steps
+            staticObstacles.forEach(ob => ob.remove()); staticObstacles = []; // Clear static obstacles
+            fallingObstacles.forEach(ob => ob.remove()); fallingObstacles = []; // Clear falling
+            horizontalObstacles.forEach(ob => ob.remove()); horizontalObstacles = []; // Clear crows
+
+
+            loadLevel(currentLevel);
+
+            // Start game loop explicitly
+            if (!gameLoopInterval) {
+                console.log("Starting game loop for the first time.");
+                gameLoopInterval = requestAnimationFrame(gameLoop);
+            }
+        }
+
+
+        // --- Event Listeners ---
+        window.addEventListener('keydown', (e) => {
+            if (e.key === ' ' && isGameOver) { e.preventDefault(); startGame(); }
+            else if (!isGameOver && !isTransitioningLevel) {
+                if (e.key === 'ArrowLeft') { moveDirection.left = true; }
+                else if (e.key === 'ArrowRight') { moveDirection.right = true; }
+                else if (e.key === ' ' || e.key === 'ArrowUp') { e.preventDefault(); initiateJump(); }
+            }
+        });
+        window.addEventListener('keyup', (e) => {
+             if (e.key === 'ArrowLeft') { moveDirection.left = false; }
+             else if (e.key === 'ArrowRight') { moveDirection.right = false; }
+             else if (e.key === ' ' || e.key === 'ArrowUp') { cutJump(); }
+        });
+
+        // Adjust layout on resize
+         window.addEventListener('resize', () => {
+            // Recreate static obstacles and steps if game is running
+            if (gameHasEverStarted && !isGameOver && !isTransitioningLevel) {
+                createStaticObstacles();
+                createSteps(); // Recreate steps on resize too
+            }
+            else if (!gameHasEverStarted) { // Initial positioning before game starts
+                 const playerWidth = player.offsetWidth || 50; playerPos.x = playerWidth / 2;
+                 playerPos.y = groundLevel; // Use groundLevel constant
+                 player.style.left = `${playerPos.x}px`; player.style.bottom = `${playerPos.y}px`;
+            }
+         });
+
+        // --- Initial Setup ---
+        // Updated initial setup
+        window.onload = () => {
+             // Set initial player position based on groundLevel
+             const playerWidth = player.offsetWidth || 50; playerPos.x = playerWidth / 2;
+             playerPos.y = groundLevel; // Use groundLevel constant
+             player.style.left = `${playerPos.x}px`; player.style.bottom = `${playerPos.y}px`;
+
+             isGameOver = true; updateHeartsDisplay(); updateLevelDisplay();
+             showPermanentMessage("<span class='title'>THIS IS FINE.</span><span class='start-key'>Start</span><br><div class='spacebar-icon'></div>");
+             player.style.visibility = 'hidden'; exit.style.visibility = 'hidden';
+             gameInfo.style.visibility = 'hidden'; // UI hidden initially
+             // Create static obstacles/steps initially but keep them hidden
+             createStaticObstacles(); staticObstacles.forEach(ob => ob.style.visibility = 'hidden');
+             createSteps(); steps.forEach(step => step.style.visibility = 'hidden');
+             hitEffectElement.style.display = 'none';
+        };
+
+
+    </script>
+</body>
+</html>
